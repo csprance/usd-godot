@@ -167,11 +167,6 @@ if(USD_STATIC_LIBS)
         godot_extension_interface
         usd
         usdGeom
-        usdImaging
-        usdImagingGL
-        hd
-        hdSt
-        hdx
         gf
         sdf
         tf
