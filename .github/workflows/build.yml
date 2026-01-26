@@ -96,7 +96,87 @@ jobs:
       - name: Upload addon artifact
         uses: actions/upload-artifact@v4
         with:
-          name: godot-usd-${{ github.sha }}
+          name: godot-usd-linux-${{ github.sha }}
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            addons/godot-usd
+            lib
+
+  windows-build:
+    name: Build on Windows
+    runs-on: windows-latest
+    env:
+      USD_INSTALL_DIR: ${{ github.workspace }}\build-usd\install
+      GODOT_SOURCE_DIR: ${{ github.workspace }}\godot-source
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Python requirements
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install scons
+
+      - name: Cache USD build directory
+        uses: actions/cache@v4
+        with:
+          path: build-usd
+          key: ${{ runner.os }}-usd-${{ hashFiles('build-usd-minimal.bat') }}
+
+      - name: Cache godot-cpp sources
+        uses: actions/cache@v4
+        with:
+          path: godot-cpp
+          key: ${{ runner.os }}-godot-cpp-${{ hashFiles('CMakeLists.txt') }}
+
+      - name: Cache Godot source checkout
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.GODOT_SOURCE_DIR }}
+          key: ${{ runner.os }}-godot-4.4-stable
+
+      - name: Fetch Godot engine source (4.4-stable)
+        shell: pwsh
+        run: |
+          if (!(Test-Path "$env:GODOT_SOURCE_DIR\.git")) {
+            if (Test-Path "$env:GODOT_SOURCE_DIR") { Remove-Item -Recurse -Force "$env:GODOT_SOURCE_DIR" }
+            git clone --depth 1 --branch 4.4-stable https://github.com/godotengine/godot.git "$env:GODOT_SOURCE_DIR"
+          } else {
+            Push-Location "$env:GODOT_SOURCE_DIR"
+            git fetch origin 4.4-stable --depth 1
+            git checkout 4.4-stable
+            git reset --hard origin/4.4-stable
+            Pop-Location
+          }
+
+      - name: Build minimal USD toolchain
+        shell: cmd
+        run: |
+          call build-usd-minimal.bat
+
+      - name: Build Godot USD extension
+        shell: cmd
+        run: |
+          call build.bat
+
+      - name: Copy USD plugin resources into lib directory
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "$env:USD_INSTALL_DIR\lib\usd")) {
+            throw "USD plugin resources not found at $env:USD_INSTALL_DIR\lib\usd"
+          }
+          New-Item -ItemType Directory -Force -Path "lib" | Out-Null
+          if (Test-Path "lib\usd") {
+            Remove-Item -Recurse -Force "lib\usd"
+          }
+          Copy-Item "$env:USD_INSTALL_DIR\lib\usd" -Destination "lib" -Recurse
+
+      - name: Upload addon artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: godot-usd-windows-${{ github.sha }}
           if-no-files-found: error
           retention-days: 14
           path: |
