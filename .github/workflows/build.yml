@@ -104,12 +104,22 @@ jobs:
       - name: Build minimal USD toolchain (Unix)
         if: matrix.platform != 'windows'
         shell: bash
-        run: ./build-usd-minimal.sh
+        run: |
+          if [ -f "${USD_INSTALL_DIR}/cmake/pxrTargets.cmake" ]; then
+            echo "=== USD already installed (cache hit), skipping build ==="
+            exit 0
+          fi
+          ./build-usd-minimal.sh
 
       - name: Build minimal USD toolchain (Windows)
         if: matrix.platform == 'windows'
         shell: cmd
-        run: build-usd-minimal.bat
+        run: |
+          if exist "%USD_INSTALL_DIR%\cmake\pxrTargets.cmake" (
+            echo === USD already installed (cache hit), skipping build ===
+            exit /b 0
+          )
+          call build-usd-minimal.bat
 
       - name: Build Godot USD extension (Unix)
         if: matrix.platform != 'windows'
