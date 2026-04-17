@@ -116,7 +116,7 @@ jobs:
         shell: cmd
         run: |
           if exist "%USD_INSTALL_DIR%\cmake\pxrTargets.cmake" (
-            echo === USD already installed (cache hit), skipping build ===
+            echo === USD already installed ^(cache hit^), skipping build ===
             exit /b 0
           )
           call build-usd-minimal.bat
