@@ -145,8 +145,17 @@ jobs:
           echo "=== Searching for binary ${{ matrix.binary }} ==="
           BINARY_PATH=$(find . -name "${{ matrix.binary }}" -type f 2>/dev/null | grep -v '/build-usd/' | head -n1 || true)
           if [ -z "$BINARY_PATH" ]; then
-            echo "Error: built binary ${{ matrix.binary }} not found anywhere"
-            find . -name "${{ matrix.binary }}" -type f 2>/dev/null || true
+            echo "::error::built binary ${{ matrix.binary }} not found anywhere"
+            echo "--- top-level repo dirs:"
+            ls -la
+            echo "--- bin/ contents (recursive):"
+            ls -laR bin 2>/dev/null || echo "(no bin/)"
+            echo "--- lib/ contents (recursive):"
+            ls -laR lib 2>/dev/null || echo "(no lib/)"
+            echo "--- build/ contents (top 100 files):"
+            find build -maxdepth 5 2>/dev/null | head -n 100 || echo "(no build/)"
+            echo "--- any *.dll, *.so, *.dylib outside build-usd/:"
+            find . \( -name '*.dll' -o -name '*.so' -o -name '*.dylib' \) -type f 2>/dev/null | grep -v '/build-usd/' | head -n 50
             exit 1
           fi
           echo "Found binary at: $BINARY_PATH"
