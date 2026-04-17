@@ -135,34 +135,18 @@ jobs:
         shell: bash
         run: |
           set -e
+          echo "=== Staging start ==="
+          pwd
           DIST_DIR="dist/${{ matrix.name }}/addons/godot-usd"
           mkdir -p "$DIST_DIR/bin"
-
           cp addons/godot-usd/plugin.cfg "$DIST_DIR/"
           cp addons/godot-usd/plugin.gd "$DIST_DIR/"
           cp addons/godot-usd/godot-usd.gdextension "$DIST_DIR/"
-
-          # Compiled GDExtension binary: MSVC multi-config drops it in bin/<Config>/,
-          # Unix drops it in bin/. Search all likely locations.
-          BINARY_PATH=""
-          for p in \
-            "bin/${{ matrix.binary }}" \
-            "lib/${{ matrix.binary }}" \
-            "bin/RelWithDebInfo/${{ matrix.binary }}" \
-            "bin/Release/${{ matrix.binary }}" \
-            "build/RelWithDebInfo/${{ matrix.binary }}" \
-            "build/Release/${{ matrix.binary }}"; do
-            if [ -f "$p" ]; then
-              BINARY_PATH="$p"
-              break
-            fi
-          done
-          if [ -z "$BINARY_PATH" ]; then
-            BINARY_PATH=$(find bin lib build -name "${{ matrix.binary }}" -type f 2>/dev/null | head -n1)
-          fi
+          echo "=== Searching for binary ${{ matrix.binary }} ==="
+          BINARY_PATH=$(find . -name "${{ matrix.binary }}" -type f 2>/dev/null | grep -v '/build-usd/' | head -n1 || true)
           if [ -z "$BINARY_PATH" ]; then
             echo "Error: built binary ${{ matrix.binary }} not found anywhere"
-            find bin lib build -type f 2>/dev/null | head -50 || true
+            find . -name "${{ matrix.binary }}" -type f 2>/dev/null || true
             exit 1
           fi
           echo "Found binary at: $BINARY_PATH"
