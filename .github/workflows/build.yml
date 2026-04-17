@@ -73,6 +73,17 @@ jobs:
         with:
           arch: x64
 
+      - name: Clone godot-cpp
+        shell: bash
+        run: |
+          set -e
+          if [ ! -d "godot-cpp/.git" ]; then
+            if [ -d "godot-cpp" ]; then
+              rm -rf godot-cpp
+            fi
+            git clone --depth 1 --branch godot-4.4-stable https://github.com/godotengine/godot-cpp.git godot-cpp
+          fi
+
       - name: Cache USD build
         uses: actions/cache@v4
         with:
@@ -82,13 +93,13 @@ jobs:
             build-usd/deps/install
           key: ${{ runner.os }}-usd-${{ hashFiles('build-usd-minimal.sh', 'build-usd-minimal.bat') }}
 
-      - name: Cache godot-cpp build
+      - name: Cache godot-cpp build artifacts
         uses: actions/cache@v4
         with:
           path: |
             godot-cpp/bin
             godot-cpp/gen
-          key: ${{ runner.os }}-godotcpp-${{ hashFiles('godot-cpp/SConstruct', 'godot-cpp/**/*.py') }}
+          key: ${{ runner.os }}-godotcpp-godot-4.4-stable-v1
 
       - name: Build minimal USD toolchain (Unix)
         if: matrix.platform != 'windows'
@@ -121,16 +132,31 @@ jobs:
           cp addons/godot-usd/plugin.gd "$DIST_DIR/"
           cp addons/godot-usd/godot-usd.gdextension "$DIST_DIR/"
 
-          # Compiled GDExtension binary: CMake places it under ./bin on all platforms
-          if [ -f "bin/${{ matrix.binary }}" ]; then
-            cp "bin/${{ matrix.binary }}" "$DIST_DIR/bin/"
-          elif [ -f "lib/${{ matrix.binary }}" ]; then
-            cp "lib/${{ matrix.binary }}" "$DIST_DIR/bin/"
-          else
-            echo "Error: built binary ${{ matrix.binary }} not found in bin/ or lib/"
-            ls -R bin lib 2>/dev/null || true
+          # Compiled GDExtension binary: MSVC multi-config drops it in bin/<Config>/,
+          # Unix drops it in bin/. Search all likely locations.
+          BINARY_PATH=""
+          for p in \
+            "bin/${{ matrix.binary }}" \
+            "lib/${{ matrix.binary }}" \
+            "bin/RelWithDebInfo/${{ matrix.binary }}" \
+            "bin/Release/${{ matrix.binary }}" \
+            "build/RelWithDebInfo/${{ matrix.binary }}" \
+            "build/Release/${{ matrix.binary }}"; do
+            if [ -f "$p" ]; then
+              BINARY_PATH="$p"
+              break
+            fi
+          done
+          if [ -z "$BINARY_PATH" ]; then
+            BINARY_PATH=$(find bin lib build -name "${{ matrix.binary }}" -type f 2>/dev/null | head -n1)
+          fi
+          if [ -z "$BINARY_PATH" ]; then
+            echo "Error: built binary ${{ matrix.binary }} not found anywhere"
+            find bin lib build -type f 2>/dev/null | head -50 || true
             exit 1
           fi
+          echo "Found binary at: $BINARY_PATH"
+          cp "$BINARY_PATH" "$DIST_DIR/bin/"
 
           # USD plugInfo resources (monolithic static build still needs runtime resource discovery)
           if [ -d "${USD_INSTALL_DIR}/lib/usd" ]; then
