@@ -25,10 +25,6 @@ if(NOT DEFINED USD_INSTALL_DIR)
     message(FATAL_ERROR "USD_INSTALL_DIR must be defined")
 endif()
 
-if(NOT DEFINED GODOT_SOURCE_DIR)
-    message(FATAL_ERROR "GODOT_SOURCE_DIR must be defined. Set it to the path where Godot engine source code is located.")
-endif()
-
 # Include ExternalProject module
 include(ExternalProject)
 
@@ -69,12 +65,6 @@ if(NOT EXISTS "${GODOT_CPP_SOURCE_DIR}")
         message(FATAL_ERROR "Failed to clone godot-cpp repository")
     endif()
 endif()
-
-# Create an interface library for Godot extension interface
-add_library(godot_extension_interface INTERFACE)
-target_include_directories(godot_extension_interface INTERFACE
-    ${GODOT_SOURCE_DIR}/core/extension
-)
 
 # Check if godot-cpp is already built
 if(NOT EXISTS "${GODOT_CPP_LIB}")
@@ -149,13 +139,13 @@ find_package(OpenSubdiv REQUIRED)
 # Include the USD cmake targets
 include(${USD_INSTALL_DIR}/cmake/pxrTargets.cmake)
 
-# Include directories for godot-cpp
+# Include directories for godot-cpp (headers + generated bindings + gdextension_interface.h)
 target_include_directories(${PROJECT_NAME} PRIVATE
     ${GODOT_CPP_SOURCE_DIR}/include
     ${GODOT_CPP_SOURCE_DIR}/gen/include
+    ${GODOT_CPP_SOURCE_DIR}/gdextension
 )
 
-# Link against godot-cpp godot_extension_interface and USD
 target_link_directories(${PROJECT_NAME} PRIVATE
     ${GODOT_CPP_BINARY_DIR}/bin
 )
@@ -164,7 +154,6 @@ if(USD_STATIC_LIBS)
     # Link against individual USD libraries using the pxr targets
     target_link_libraries(${PROJECT_NAME} PRIVATE
         godot-cpp
-        godot_extension_interface
         usd
         usdGeom
         gf
@@ -182,7 +171,7 @@ if(USD_STATIC_LIBS)
         usdUtils
     )
 else()
-    target_link_libraries(${PROJECT_NAME} PRIVATE godot-cpp godot_extension_interface usd)
+    target_link_libraries(${PROJECT_NAME} PRIVATE godot-cpp usd)
 endif()
 
 # Set output directory and RPATH settings

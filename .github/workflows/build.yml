@@ -2,36 +2,66 @@ name: Build Godot USD Extension
 
 on:
   push:
-    branches:
-      - main
-      - master
+    branches: [main, master]
+    tags: ['v*']
   pull_request:
   workflow_dispatch:
 
 jobs:
-  linux-build:
-    name: Build on Ubuntu
-    runs-on: ubuntu-latest
+  build:
+    name: Build (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux-x86_64
+            os: ubuntu-22.04
+            platform: linux
+            binary: libgodot-usd.so
+            usd_script: bash build-usd-minimal.sh
+            build_script: bash build.sh
+          - name: windows-x86_64
+            os: windows-2022
+            platform: windows
+            binary: godot-usd.dll
+            usd_script: cmd /c build-usd-minimal.bat
+            build_script: cmd /c build.bat
+          - name: macos-universal
+            os: macos-14
+            platform: macos
+            binary: libgodot-usd.dylib
+            usd_script: bash build-usd-minimal.sh
+            build_script: bash build.sh
+
     env:
       USD_INSTALL_DIR: ${{ github.workspace }}/build-usd/install
-      GODOT_SOURCE_DIR: ${{ github.workspace }}/godot-source
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
-      - name: Install system dependencies
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install scons
+        run: python -m pip install --upgrade pip scons
+
+      - name: Install Linux system dependencies
+        if: matrix.platform == 'linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y \
             build-essential \
-            python3 \
-            python3-pip \
-            scons \
+            cmake \
+            ninja-build \
             git \
             curl \
             unzip \
-            cmake \
-            ninja-build \
             libglu1-mesa-dev \
             libxi-dev \
             libxrandr-dev \
@@ -43,142 +73,130 @@ jobs:
             libglew-dev \
             zlib1g-dev
 
-      - name: Cache USD build directory
+      - name: Activate MSVC environment
+        if: matrix.platform == 'windows'
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Cache USD build
         uses: actions/cache@v4
         with:
-          path: build-usd
-          key: ${{ runner.os }}-usd-${{ hashFiles('build-usd-minimal.sh') }}
+          path: |
+            build-usd/install
+            build-usd/build
+            build-usd/deps/install
+          key: ${{ runner.os }}-usd-${{ hashFiles('build-usd-minimal.sh', 'build-usd-minimal.bat') }}
 
-      - name: Cache godot-cpp sources
+      - name: Cache godot-cpp build
         uses: actions/cache@v4
         with:
-          path: godot-cpp
-          key: ${{ runner.os }}-godot-cpp-${{ hashFiles('CMakeLists.txt') }}
-
-      - name: Cache Godot source checkout
-        uses: actions/cache@v4
-        with:
-          path: ${{ env.GODOT_SOURCE_DIR }}
-          key: ${{ runner.os }}-godot-4.4-stable
-
-      - name: Fetch Godot engine source (4.4-stable)
-        run: |
-          if [ ! -d "${GODOT_SOURCE_DIR}/.git" ]; then
-            rm -rf "${GODOT_SOURCE_DIR}"
-            git clone --depth 1 --branch 4.4-stable https://github.com/godotengine/godot.git "${GODOT_SOURCE_DIR}"
-          else
-            cd "${GODOT_SOURCE_DIR}"
-            git fetch origin 4.4-stable --depth 1
-            git checkout 4.4-stable
-            git reset --hard origin/4.4-stable
-          fi
+          path: |
+            godot-cpp/bin
+            godot-cpp/gen
+          key: ${{ runner.os }}-godotcpp-${{ hashFiles('godot-cpp/SConstruct', 'godot-cpp/**/*.py') }}
 
       - name: Build minimal USD toolchain
-        run: |
-          chmod +x build-usd-minimal.sh
-          ./build-usd-minimal.sh
+        shell: bash
+        run: ${{ matrix.usd_script }}
 
       - name: Build Godot USD extension
-        run: |
-          chmod +x build.sh
-          ./build.sh
+        shell: bash
+        run: ${{ matrix.build_script }}
 
-      - name: Copy USD plugin resources into lib directory
+      - name: Stage addon payload
+        shell: bash
         run: |
-          if [ ! -d "${USD_INSTALL_DIR}/lib/usd" ]; then
-            echo "USD plugin resources were not found in ${USD_INSTALL_DIR}/lib/usd"
+          set -e
+          DIST_DIR="dist/${{ matrix.name }}/addons/godot-usd"
+          mkdir -p "$DIST_DIR/bin"
+
+          cp addons/godot-usd/plugin.cfg "$DIST_DIR/"
+          cp addons/godot-usd/plugin.gd "$DIST_DIR/"
+          cp addons/godot-usd/godot-usd.gdextension "$DIST_DIR/"
+
+          # Compiled GDExtension binary: CMake places it under ./bin on all platforms
+          if [ -f "bin/${{ matrix.binary }}" ]; then
+            cp "bin/${{ matrix.binary }}" "$DIST_DIR/bin/"
+          elif [ -f "lib/${{ matrix.binary }}" ]; then
+            cp "lib/${{ matrix.binary }}" "$DIST_DIR/bin/"
+          else
+            echo "Error: built binary ${{ matrix.binary }} not found in bin/ or lib/"
+            ls -R bin lib 2>/dev/null || true
             exit 1
           fi
-          mkdir -p lib
-          rm -rf lib/usd
-          cp -R "${USD_INSTALL_DIR}/lib/usd" lib/
 
-      - name: Upload addon artifact
+          # USD plugInfo resources (monolithic static build still needs runtime resource discovery)
+          if [ -d "${USD_INSTALL_DIR}/lib/usd" ]; then
+            cp -R "${USD_INSTALL_DIR}/lib/usd" "$DIST_DIR/bin/usd"
+          else
+            echo "Warning: USD plugInfo resources not found at ${USD_INSTALL_DIR}/lib/usd"
+          fi
+
+      - name: Upload platform artifact
         uses: actions/upload-artifact@v4
         with:
-          name: godot-usd-linux-${{ github.sha }}
+          name: godot-usd-${{ matrix.platform }}
           if-no-files-found: error
           retention-days: 14
-          path: |
-            addons/godot-usd
-            lib
+          path: dist/${{ matrix.name }}
 
-  windows-build:
-    name: Build on Windows
-    runs-on: windows-latest
-    env:
-      USD_INSTALL_DIR: ${{ github.workspace }}\build-usd\install
-      GODOT_SOURCE_DIR: ${{ github.workspace }}\godot-source
+  release:
+    name: Publish release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install Python requirements
-        shell: pwsh
+      - name: Verify tag matches plugin.cfg version
         run: |
-          python -m pip install --upgrade pip
-          python -m pip install scons
+          set -e
+          CFG_VERSION=$(grep '^version=' addons/godot-usd/plugin.cfg | cut -d'"' -f2)
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          echo "plugin.cfg version: ${CFG_VERSION}"
+          echo "git tag version:    ${TAG_VERSION}"
+          if [ "${CFG_VERSION}" != "${TAG_VERSION}" ]; then
+            echo "::error::Git tag '${GITHUB_REF_NAME}' does not match plugin.cfg version '${CFG_VERSION}'. Bump plugin.cfg before tagging."
+            exit 1
+          fi
+          echo "VERSION=${CFG_VERSION}" >> "$GITHUB_ENV"
 
-      - name: Cache USD build directory
-        uses: actions/cache@v4
+      - name: Download all platform artifacts
+        uses: actions/download-artifact@v4
         with:
-          path: build-usd
-          key: ${{ runner.os }}-usd-${{ hashFiles('build-usd-minimal.bat') }}
+          path: artifacts
+          pattern: godot-usd-*
 
-      - name: Cache godot-cpp sources
-        uses: actions/cache@v4
+      - name: Build release zips
+        run: |
+          set -e
+          mkdir -p dist
+
+          # Per-platform zips — each contains only one platform's binary.
+          for d in artifacts/godot-usd-*; do
+            platform=$(basename "$d" | sed 's/^godot-usd-//')
+            (cd "$d" && zip -r "${GITHUB_WORKSPACE}/dist/godot-usd-${platform}-v${VERSION}.zip" addons)
+          done
+
+          # Universal zip — merges all platform binaries into one addons/godot-usd/bin tree.
+          mkdir -p universal/addons/godot-usd/bin
+          cp artifacts/godot-usd-linux/addons/godot-usd/plugin.cfg universal/addons/godot-usd/
+          cp artifacts/godot-usd-linux/addons/godot-usd/plugin.gd universal/addons/godot-usd/
+          cp artifacts/godot-usd-linux/addons/godot-usd/godot-usd.gdextension universal/addons/godot-usd/
+          for d in artifacts/godot-usd-*; do
+            cp -R "$d/addons/godot-usd/bin/." universal/addons/godot-usd/bin/
+          done
+          (cd universal && zip -r "${GITHUB_WORKSPACE}/dist/godot-usd-universal-v${VERSION}.zip" addons)
+
+          ls -la dist/
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
         with:
-          path: godot-cpp
-          key: ${{ runner.os }}-godot-cpp-${{ hashFiles('CMakeLists.txt') }}
-
-      - name: Cache Godot source checkout
-        uses: actions/cache@v4
-        with:
-          path: ${{ env.GODOT_SOURCE_DIR }}
-          key: ${{ runner.os }}-godot-4.4-stable
-
-      - name: Fetch Godot engine source (4.4-stable)
-        shell: pwsh
-        run: |
-          if (!(Test-Path "$env:GODOT_SOURCE_DIR\.git")) {
-            if (Test-Path "$env:GODOT_SOURCE_DIR") { Remove-Item -Recurse -Force "$env:GODOT_SOURCE_DIR" }
-            git clone --depth 1 --branch 4.4-stable https://github.com/godotengine/godot.git "$env:GODOT_SOURCE_DIR"
-          } else {
-            Push-Location "$env:GODOT_SOURCE_DIR"
-            git fetch origin 4.4-stable --depth 1
-            git checkout 4.4-stable
-            git reset --hard origin/4.4-stable
-            Pop-Location
-          }
-
-      - name: Build minimal USD toolchain
-        shell: cmd
-        run: |
-          call build-usd-minimal.bat
-
-      - name: Build Godot USD extension
-        shell: cmd
-        run: |
-          call build.bat
-
-      - name: Copy USD plugin resources into lib directory
-        shell: pwsh
-        run: |
-          if (-not (Test-Path "$env:USD_INSTALL_DIR\lib\usd")) {
-            throw "USD plugin resources not found at $env:USD_INSTALL_DIR\lib\usd"
-          }
-          New-Item -ItemType Directory -Force -Path "lib" | Out-Null
-          if (Test-Path "lib\usd") {
-            Remove-Item -Recurse -Force "lib\usd"
-          }
-          Copy-Item "$env:USD_INSTALL_DIR\lib\usd" -Destination "lib" -Recurse
-
-      - name: Upload addon artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: godot-usd-windows-${{ github.sha }}
-          if-no-files-found: error
-          retention-days: 14
-          path: |
-            addons/godot-usd
-            lib
+          files: dist/*.zip
+          generate_release_notes: true
+          fail_on_unmatched_files: true

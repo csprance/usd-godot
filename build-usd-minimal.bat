@@ -162,10 +162,8 @@ cmake --build . --config Release --target install
 echo === USD Build Complete ===
 echo USD has been built and installed to: %USD_INSTALL_DIR%
 echo.
-echo To build the Godot-USD plugin, set the following environment variables:
+echo To build the Godot-USD plugin:
 echo set USD_INSTALL_DIR=%USD_INSTALL_DIR%
-echo set GODOT_SOURCE_DIR=C:\path\to\godot\source
-echo.
 echo Then run: build.bat
 
 cd "%~dp0"
