@@ -19,20 +19,14 @@ jobs:
             os: ubuntu-22.04
             platform: linux
             binary: libgodot-usd.so
-            usd_script: bash build-usd-minimal.sh
-            build_script: bash build.sh
           - name: windows-x86_64
             os: windows-2022
             platform: windows
             binary: godot-usd.dll
-            usd_script: cmd /c build-usd-minimal.bat
-            build_script: cmd /c build.bat
           - name: macos-universal
             os: macos-14
             platform: macos
             binary: libgodot-usd.dylib
-            usd_script: bash build-usd-minimal.sh
-            build_script: bash build.sh
 
     env:
       USD_INSTALL_DIR: ${{ github.workspace }}/build-usd/install
@@ -96,13 +90,25 @@ jobs:
             godot-cpp/gen
           key: ${{ runner.os }}-godotcpp-${{ hashFiles('godot-cpp/SConstruct', 'godot-cpp/**/*.py') }}
 
-      - name: Build minimal USD toolchain
+      - name: Build minimal USD toolchain (Unix)
+        if: matrix.platform != 'windows'
         shell: bash
-        run: ${{ matrix.usd_script }}
+        run: ./build-usd-minimal.sh
 
-      - name: Build Godot USD extension
+      - name: Build minimal USD toolchain (Windows)
+        if: matrix.platform == 'windows'
+        shell: cmd
+        run: build-usd-minimal.bat
+
+      - name: Build Godot USD extension (Unix)
+        if: matrix.platform != 'windows'
         shell: bash
-        run: ${{ matrix.build_script }}
+        run: ./build.sh
+
+      - name: Build Godot USD extension (Windows)
+        if: matrix.platform == 'windows'
+        shell: cmd
+        run: build.bat
 
       - name: Stage addon payload
         shell: bash
