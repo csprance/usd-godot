@@ -163,7 +163,12 @@ endif()
 # Set CMAKE_PREFIX_PATH to include the USD dependencies
 list(APPEND CMAKE_PREFIX_PATH "${CMAKE_CURRENT_SOURCE_DIR}/build-usd/deps/install")
 
-# Find required packages for USD
+# Find required packages for USD.
+# Threads::Threads is a transitive target TBB exports. With shared TBB the
+# DLL hid it, but static TBB's TBBTargets.cmake references Threads::Threads
+# directly — so consumers must find_package(Threads) first or CMake errors
+# with "contains Threads::Threads but the target was not found".
+find_package(Threads REQUIRED)
 find_package(TBB REQUIRED)
 find_package(OpenGL REQUIRED)
 find_package(OpenSubdiv REQUIRED)
