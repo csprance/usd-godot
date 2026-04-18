@@ -18,12 +18,15 @@ cmake .. ^
   -DUSD_INSTALL_DIR=%USD_INSTALL_DIR% ^
   -DCMAKE_BUILD_TYPE=RelWithDebInfo ^
   -G "Visual Studio 17 2022" -A x64
+if errorlevel 1 exit /b 1
 
 :: Build
 cmake --build . --config RelWithDebInfo
+if errorlevel 1 exit /b 1
 
 :: Install to local addons directory
 cmake --install . --prefix=../ --config RelWithDebInfo
+if errorlevel 1 exit /b 1
 
 echo.
 echo Build completed successfully!
