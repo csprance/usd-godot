@@ -128,6 +128,16 @@ set(SOURCES
 # Create the shared library
 add_library(${PROJECT_NAME} SHARED ${SOURCES})
 
+# Windows: USD's pxrTslRobinMap headers use std::numeric_limits<T>::max(), which
+# breaks if windows.h's min/max macros leak in. NOMINMAX suppresses them.
+if(WIN32)
+    target_compile_definitions(${PROJECT_NAME} PRIVATE
+        NOMINMAX
+        WIN32_LEAN_AND_MEAN
+        _USE_MATH_DEFINES
+    )
+endif()
+
 # Set CMAKE_PREFIX_PATH to include the USD dependencies
 list(APPEND CMAKE_PREFIX_PATH "${CMAKE_CURRENT_SOURCE_DIR}/build-usd/deps/install")
 
