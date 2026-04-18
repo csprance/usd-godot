@@ -72,7 +72,7 @@ if not exist "%USD_DEPS_DIR%\install\lib\tbb.lib" (
     cd oneTBB
     if not exist "build" mkdir build
     cd build
-    cmake .. -DTBB_TEST=OFF -DTBB_STRICT=OFF -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="%USD_DEPS_DIR%\install" -G "Visual Studio 17 2022" -A x64
+    cmake .. -DTBB_TEST=OFF -DTBB_STRICT=OFF -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="%USD_DEPS_DIR%\install" -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded -DCMAKE_POLICY_DEFAULT_CMP0091=NEW -G "Visual Studio 17 2022" -A x64
     cmake --build . --config Release && cmake --install . --config Release
     cd "%USD_DEPS_DIR%"
 ) else (
@@ -107,6 +107,7 @@ if not exist "%USD_DEPS_DIR%\install\lib\osdCPU.lib" (
       -DNO_OPENCL=ON -DNO_DX=ON -DNO_TESTS=ON -DNO_GLEW=ON ^
       -DNO_GLFW=ON -DNO_PTEX=ON -DNO_TBB=ON ^
       -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="%USD_DEPS_DIR%\install" ^
+      -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded -DCMAKE_POLICY_DEFAULT_CMP0091=NEW ^
       -G "Visual Studio 17 2022" -A x64
     cmake --build . --config Release && cmake --install . --config Release
     cd "%USD_DEPS_DIR%"
@@ -153,6 +154,8 @@ cmake "%USD_SOURCE_DIR%" ^
   -DCMAKE_PREFIX_PATH="%USD_DEPS_DIR%\install" ^
   -DTBB_ROOT="%USD_DEPS_DIR%\install" ^
   -DCMAKE_BUILD_TYPE=Release ^
+  -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded ^
+  -DCMAKE_POLICY_DEFAULT_CMP0091=NEW ^
   -G "Visual Studio 17 2022" -A x64
 
 :: Build and install USD

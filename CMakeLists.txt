@@ -150,8 +150,14 @@ endif()
 # (which method_bind.hpp does) fails with C2440.
 # /utf-8 makes MSVC interpret source and execution character sets as UTF-8, which
 # USD headers rely on.
+# MSVC_RUNTIME_LIBRARY = MultiThreaded (i.e. /MT) matches godot-cpp's scons
+# build; /MD vs /MT mismatch triggers LNK2038 at link time. USD is rebuilt with
+# /MT too via build-usd-minimal.{sh,bat}.
 if(MSVC)
     target_compile_options(${PROJECT_NAME} PRIVATE /vmg /utf-8 /EHsc)
+    set_target_properties(${PROJECT_NAME} PROPERTIES
+        MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>"
+    )
 endif()
 
 # Set CMAKE_PREFIX_PATH to include the USD dependencies
