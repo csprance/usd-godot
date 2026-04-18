@@ -138,6 +138,16 @@ if(WIN32)
     )
 endif()
 
+# MSVC: /vmg forces the "most general" representation for pointers-to-member-
+# functions. godot-cpp's scons build uses /vmg, so consumers must too — otherwise
+# reinterpret_cast between godot::USDPlugin::* and godot::_gde_UnexistingClass::*
+# (which method_bind.hpp does) fails with C2440.
+# /utf-8 makes MSVC interpret source and execution character sets as UTF-8, which
+# USD headers rely on.
+if(MSVC)
+    target_compile_options(${PROJECT_NAME} PRIVATE /vmg /utf-8 /EHsc)
+endif()
+
 # Set CMAKE_PREFIX_PATH to include the USD dependencies
 list(APPEND CMAKE_PREFIX_PATH "${CMAKE_CURRENT_SOURCE_DIR}/build-usd/deps/install")
 
