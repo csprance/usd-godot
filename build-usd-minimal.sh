@@ -65,7 +65,7 @@ fi
 if [ ! -f "${USD_DEPS_DIR}/install/lib/libtbb.a" ] && [ ! -f "${USD_DEPS_DIR}/install/lib/libtbb.dylib" ] && [ ! -f "${USD_DEPS_DIR}/install/lib/libtbb.so" ]; then
     echo "Building TBB..."
     cd "$TARGET_DIR" && mkdir -p build && cd build
-    cmake .. -DTBB_TEST=OFF -DTBB_STRICT=OFF -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=${USD_DEPS_DIR}/install
+    cmake .. -DTBB_TEST=OFF -DTBB_STRICT=OFF -DBUILD_SHARED_LIBS=OFF -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=${USD_DEPS_DIR}/install
     cmake --build . --config Release && cmake --install .
     cd ${USD_DEPS_DIR}
 else
@@ -90,6 +90,7 @@ if [ ! -f "${USD_DEPS_DIR}/install/lib/libosdCPU.a" ] && [ ! -f "${USD_DEPS_DIR}
       -DNO_REGRESSION=ON -DNO_DOC=ON -DNO_OMP=ON -DNO_CUDA=ON \
       -DNO_OPENCL=ON -DNO_DX=ON -DNO_TESTS=ON -DNO_GLEW=ON \
       -DNO_GLFW=ON -DNO_PTEX=ON -DNO_TBB=ON \
+      -DBUILD_SHARED_LIBS=OFF \
       -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=${USD_DEPS_DIR}/install
     cmake --build . --config Release && cmake --install .
     cd ${USD_DEPS_DIR}

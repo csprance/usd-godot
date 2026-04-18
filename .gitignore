@@ -42,8 +42,13 @@ Makefile
 *.cmake
 !CMakeLists.txt
 
-# IDE related
-.vscode/
+# IDE related — keep shared workspace config, ignore personal state
+.vscode/*
+!.vscode/tasks.json
+!.vscode/settings.json
+!.vscode/extensions.json
+!.vscode/launch.json
+!.vscode/msvc-env.cmd
 .idea/
 *.swp
 *.swo

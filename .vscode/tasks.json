@@ -1,0 +1,146 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    // ─── USD toolchain (one-time ~30-45 min cold on Windows) ────────────────
+    {
+      "label": "USD: Build toolchain",
+      "detail": "Builds TBB, OpenSubdiv, and monolithic-static OpenUSD into build-usd/install. Run once, then only re-run if deps or flags change.",
+      "type": "shell",
+      "options": { "cwd": "${workspaceFolder}" },
+      "windows": {
+        "command": ".vscode\\msvc-env.cmd",
+        "args": ["build-usd-minimal.bat"]
+      },
+      "linux":  { "command": "bash", "args": ["build-usd-minimal.sh"] },
+      "osx":    { "command": "bash", "args": ["build-usd-minimal.sh"] },
+      "problemMatcher": "$msCompile",
+      "presentation": { "reveal": "always", "panel": "dedicated", "clear": true },
+      "group": "build"
+    },
+
+    // ─── GDExtension build (edit-build-test loop) ───────────────────────────
+    {
+      "label": "Extension: Build",
+      "detail": "Configures + compiles godot-usd (CMake + MSVC on Windows). Incremental — re-run after code changes. Default build task (Ctrl/Cmd+Shift+B).",
+      "type": "shell",
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "env": { "USD_INSTALL_DIR": "${workspaceFolder}/build-usd/install" }
+      },
+      "windows": {
+        "command": ".vscode\\msvc-env.cmd",
+        "args": ["build.bat"],
+        "options": {
+          "env": { "USD_INSTALL_DIR": "${workspaceFolder}\\build-usd\\install" }
+        }
+      },
+      "linux":  { "command": "bash", "args": ["build.sh"] },
+      "osx":    { "command": "bash", "args": ["build.sh"] },
+      "problemMatcher": "$msCompile",
+      "presentation": { "reveal": "always", "panel": "shared", "clear": true },
+      "group": { "kind": "build", "isDefault": true }
+    },
+
+    // ─── Copy built artifacts into the test_project ─────────────────────────
+    {
+      "label": "Extension: Install to test_project",
+      "detail": "Copies the compiled binary and addon files into test_project/addons/godot-usd/ so you can open test_project in Godot to try the plugin.",
+      "type": "shell",
+      "options": { "cwd": "${workspaceFolder}" },
+      "windows": {
+        "command": "powershell",
+        "args": [
+          "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command",
+          "$dest = 'test_project/addons/godot-usd'; $bin = Join-Path $dest 'bin'; New-Item -ItemType Directory -Force $bin | Out-Null; Copy-Item -Force 'addons/godot-usd/plugin.cfg','addons/godot-usd/plugin.gd','addons/godot-usd/godot-usd.gdextension' $dest; $dll = Get-ChildItem -Path bin,build -Recurse -Filter godot-usd.dll -ErrorAction SilentlyContinue | Select-Object -First 1; if (-not $dll) { throw 'godot-usd.dll not found. Run `Extension: Build` first.' }; Copy-Item -Force $dll.FullName $bin; if (Test-Path 'build-usd/install/lib/usd') { Copy-Item -Recurse -Force 'build-usd/install/lib/usd' $bin }; Write-Host \"Installed to $dest\""
+        ]
+      },
+      "linux": {
+        "command": "bash",
+        "args": ["-lc",
+          "set -e; dest=test_project/addons/godot-usd; mkdir -p \"$dest/bin\"; cp addons/godot-usd/plugin.cfg addons/godot-usd/plugin.gd addons/godot-usd/godot-usd.gdextension \"$dest/\"; bin=$(find bin lib build -name 'libgodot-usd.so' -o -name 'libgodot-usd.dylib' -o -name 'godot-usd.dll' 2>/dev/null | head -n1); [ -n \"$bin\" ] || { echo 'built binary not found; run Extension: Build first' >&2; exit 1; }; cp \"$bin\" \"$dest/bin/\"; [ -d build-usd/install/lib/usd ] && cp -R build-usd/install/lib/usd \"$dest/bin/\" || true; echo \"Installed to $dest\""
+        ]
+      },
+      "osx": {
+        "command": "bash",
+        "args": ["-lc",
+          "set -e; dest=test_project/addons/godot-usd; mkdir -p \"$dest/bin\"; cp addons/godot-usd/plugin.cfg addons/godot-usd/plugin.gd addons/godot-usd/godot-usd.gdextension \"$dest/\"; bin=$(find bin lib build -name 'libgodot-usd.dylib' -o -name 'libgodot-usd.so' 2>/dev/null | head -n1); [ -n \"$bin\" ] || { echo 'built binary not found; run Extension: Build first' >&2; exit 1; }; cp \"$bin\" \"$dest/bin/\"; [ -d build-usd/install/lib/usd ] && cp -R build-usd/install/lib/usd \"$dest/bin/\" || true; echo \"Installed to $dest\""
+        ]
+      },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "shared", "clear": false },
+      "group": "build"
+    },
+
+    // ─── Build + install in one shot ─────────────────────────────────────────
+    {
+      "label": "Extension: Build & install to test_project",
+      "detail": "Runs `Extension: Build` followed by `Extension: Install to test_project`.",
+      "dependsOn": ["Extension: Build", "Extension: Install to test_project"],
+      "dependsOrder": "sequence",
+      "problemMatcher": [],
+      "group": "build"
+    },
+
+    // ─── Clean ──────────────────────────────────────────────────────────────
+    {
+      "label": "Extension: Clean",
+      "detail": "Removes build/ and bin/ (the godot-usd extension's CMake build tree). Leaves build-usd/ alone — USD is expensive to rebuild.",
+      "type": "shell",
+      "options": { "cwd": "${workspaceFolder}" },
+      "windows": {
+        "command": "powershell",
+        "args": [
+          "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command",
+          "Remove-Item -Recurse -Force -ErrorAction SilentlyContinue build,bin; Write-Host 'Cleaned build/ and bin/'"
+        ]
+      },
+      "linux": { "command": "bash", "args": ["-lc", "rm -rf build bin && echo 'Cleaned build/ and bin/'"] },
+      "osx":   { "command": "bash", "args": ["-lc", "rm -rf build bin && echo 'Cleaned build/ and bin/'"] },
+      "problemMatcher": [],
+      "presentation": { "reveal": "silent", "panel": "shared" },
+      "group": "build"
+    },
+
+    // ─── Launch Godot editor with the test project ──────────────────────────
+    // Override "godot" if it's not on PATH: set terminal.integrated.env.*.GODOT
+    // in .vscode/settings.json, or edit the command to a full path.
+    {
+      "label": "Godot: Open test_project (editor)",
+      "detail": "Launches the Godot editor against test_project/. Requires `godot` on PATH or set env.GODOT in settings.json.",
+      "type": "shell",
+      "options": { "cwd": "${workspaceFolder}" },
+      "windows": {
+        "command": "powershell",
+        "args": [
+          "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command",
+          "$exe = $env:GODOT; if (-not $exe) { $exe = 'godot' }; & $exe --editor --path test_project"
+        ]
+      },
+      "linux": { "command": "bash", "args": ["-lc", "${GODOT:-godot} --editor --path test_project"] },
+      "osx":   { "command": "bash", "args": ["-lc", "${GODOT:-godot} --editor --path test_project"] },
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": { "reveal": "silent", "panel": "shared" }
+    },
+
+    // ─── Run the test project (play mode) ───────────────────────────────────
+    {
+      "label": "Godot: Run test_project",
+      "detail": "Runs test_project/ in Godot without the editor (play mode).",
+      "type": "shell",
+      "options": { "cwd": "${workspaceFolder}" },
+      "windows": {
+        "command": "powershell",
+        "args": [
+          "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command",
+          "$exe = $env:GODOT; if (-not $exe) { $exe = 'godot' }; & $exe --path test_project"
+        ]
+      },
+      "linux": { "command": "bash", "args": ["-lc", "${GODOT:-godot} --path test_project"] },
+      "osx":   { "command": "bash", "args": ["-lc", "${GODOT:-godot} --path test_project"] },
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "shared" }
+    }
+  ]
+}

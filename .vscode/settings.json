@@ -1,0 +1,40 @@
+{
+  // ─── Godot launcher ───────────────────────────────────────────────────────
+  // Point this at your Godot 4.4+ editor executable. The `Godot: Open / Run`
+  // tasks use $env:GODOT on Windows and $GODOT on Unix. If Godot is already
+  // on your PATH as `godot`, you can delete these lines entirely.
+  "terminal.integrated.env.windows": {
+    // "GODOT": "C:\\Path\\To\\Godot_v4.4-stable_win64.exe"
+  },
+  "terminal.integrated.env.linux": {
+    // "GODOT": "/path/to/godot"
+  },
+  "terminal.integrated.env.osx": {
+    // "GODOT": "/Applications/Godot.app/Contents/MacOS/Godot"
+  },
+
+  // ─── CMake Tools (IntelliSense for godot-usd) ────────────────────────────
+  // With the CMake Tools extension installed, this tells it where the
+  // CMakeLists lives and what flags to pass. Configure once with the command
+  // "CMake: Configure", then IntelliSense and Go-to-Definition light up.
+  "cmake.sourceDirectory": "${workspaceFolder}",
+  "cmake.buildDirectory":  "${workspaceFolder}/build",
+  "cmake.configureArgs": [
+    "-DUSD_INSTALL_DIR=${workspaceFolder}/build-usd/install",
+    "-DCMAKE_BUILD_TYPE=RelWithDebInfo"
+  ],
+  "cmake.generator": "Visual Studio 17 2022",
+  "cmake.platform": "x64",
+
+  // ─── Files ────────────────────────────────────────────────────────────────
+  // Hide generated tool output from the explorer so it's not noisy.
+  "files.exclude": {
+    "**/.git": true,
+    "**/*.uid": true,
+    "bin/": false,
+    "build/": false,
+    "build-usd/": true,
+    "godot-cpp/bin/": true,
+    "godot-cpp/gen/": true
+  }
+}
